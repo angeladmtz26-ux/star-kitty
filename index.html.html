@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Star Kitty</title>
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(to bottom,
+ #0f2027, #203a43, #2c5364);
+       font-family: Arial;
+}
+canvas {
+    display: block;
+    margin: auto;
+    background: transparent;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game" width="900" height="300"></
+canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let gameState = "start";
+let speed = 6;
+let score = 0;
+let frame = 0;
+
+let jumpSound = new Audio(); 
+jumpSound.src = 
+"https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg";
+
+let cat = {
+    x: 100,
+    y: 200,
+    width: 40,
+    height: 40,
+    dy: 0,
+    gravity: 0.9,
+    jumpPower: -15,
+    grounded: true,
+    animation: 0
+};
+
+let obstacles = [];
+let clouds = [];
+let skyStars = [];
+let particles = [];
+
+/* Crear estrellas de fondo */
+for(let i=0;i<60;i++){
+    skyStars.push({
+        x: Math.random()*canvas.width,
+        y: Math.random()*150,
+        size: Math.random()*2
+    });
+}
+
+/* Crear nubes */
+for(let i=0;i<5;i++){
+    clouds.push({
+        x: Math.random()*canvas.width,
+        y: 40 + Math.random()*60,
+        speed: 1 + Math.random()
+    });
+}
+
+document.addEventListener("keydown", function(e){
+    if(e.code === "Space"){
+        if(gameState === "start"){
+            gameState = "play";
+        }
+        else if(gameState === "play" && cat.grounded){
+            cat.dy = cat.jumpPower;
+            cat.grounded = false;
+            jumpSound.play();
+            createParticles();
+        }
+        else if(gameState === "gameover"){
+            location.reload();
+        }
+    }
+});
+
+function createObstacle(){
+    obstacles.push({
+        x: canvas.width,
+        y: 210,
+        size: 30
+    });
+}
+
+function createParticles(){
+    for(let i=0;i<10;i++){
+        particles.push({
+            x: cat.x+20,
+            y: cat.y+20,
+            dx:(Math.random()-0.5)*5,
+            dy:(Math.random()-0.5)*5,
+            life:30
+        });
+    }
+}
+
+function update(){
+    if(gameState !== "play") return;
+
+    frame++;
+    if(frame % 80 === 0) createObstacle();
+    if(frame % 400 === 0) speed += 0.5;
+
+    cat.dy += cat.gravity;
+    cat.y += cat.dy;
+
+    if(cat.y >= 200){
+        cat.y = 200;
+        cat.dy = 0;
+        cat.grounded = true;
+    }
+
+    obstacles.forEach((obs,index)=>{
+        obs.x -= speed;
+
+        if(cat.x < obs.x+obs.size &&
+           cat.x+cat.width > obs.x &&
+           cat.y < obs.y+obs.size &&
+           cat.y+cat.height > obs.y){
+            gameState = "gameover";
+        }
+
+        if(obs.x+obs.size < 0){
+            obstacles.splice(index,1);
+            score++;
+        }
+    });
+
+    clouds.forEach(cloud=>{
+        cloud.x -= cloud.speed;
+        if(cloud.x < -100) cloud.x = canvas.width;
+    });
+
+    particles.forEach((p,index)=>{
+        p.x+=p.dx;
+        p.y+=p.dy;
+        p.life--;
+        if(p.life<=0) particles.splice(index,1);
+    });
+
+    cat.animation++;
+}
+
+function drawStar(x,y,size){
+    ctx.fillStyle="gold";
+    ctx.beginPath();
+    for(let i=0;i<5;i++){
+        ctx.lineTo(
+            x + size * Math.cos((18 + i * 72) * Math.PI / 180),
+            y - size * Math.sin((18 + i * 72) * Math.PI / 180)
+        );
+        ctx.lineTo(
+            x + size/2 * Math.cos((54 + i * 72) * Math.PI / 180),
+            y - size/2 * Math.sin((54 + i * 72) * Math.PI / 180)
+        );
+    }
+    ctx.closePath();
+    ctx.fill();
+}
+
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    /* cielo estrellas */
+    ctx.fillStyle="white";
+    skyStars.forEach(star=>{
+        ctx.fillRect(star.x,star.y,star.size,star.size);
+    });
+
+    /* nubes */
+    ctx.font="40px Arial";
+    clouds.forEach(cloud=>{
+        ctx.fillText("☁",cloud.x,cloud.y);
+    });
+
+    /* piso */
+    ctx.fillStyle="white";
+    ctx.fillRect(0,240,canvas.width,2);
+
+    if(gameState === "start"){
+        ctx.fillStyle="white";
+        ctx.font="40px Arial";
+        ctx.fillText("Star Kitty",350,120);
+        ctx.font="20px Arial";
+        ctx.fillText("Press Space to Start",360,160);
+    }
+
+    if(gameState === "play"){
+        let catFace = cat.animation%20<10 ? "🐱":"😺";
+        ctx.font="35px Arial";
+        ctx.fillText(catFace,cat.x,cat.y+30);
+
+        obstacles.forEach(obs=>{
+            drawStar(obs.x+obs.size/2,obs.y+obs.size/2,obs.size/2);
+        });
+
+        ctx.font="16px Arial";
+        ctx.fillStyle="white";
+        ctx.fillText("Score: "+score,800,20);
+    }
+
+    if(gameState === "gameover"){
+        ctx.fillStyle="white";
+        ctx.font="35px Arial";
+        ctx.fillText("Game Over",360,130);
+        ctx.font="20px Arial";
+        ctx.fillText("Score: "+score,400,160);
+        ctx.fillText("Press Space to Restart",340,190);
+    }
+
+    ctx.font="12px Arial";
+    particles.forEach(p=>{
+        ctx.fillText("✨",p.x,p.y);
+    });
+}
+
+function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
